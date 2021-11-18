@@ -1,12 +1,11 @@
 ---
 layout: post
-title:  "Welcome to Atomic Increment"
+title:  "What is an atomic increment?"
 date:   2021-11-17 14:12:06 +0000
 categories: welcome
 ---
-# Welcome to Atomic Increment Ltd.
-
-Why Atomic Increment? One of the myriad ways of improving code performance
+Why do we call ourselves Atomic Increment?
+One of the myriad ways of improving code performance
 is to use multithreaded code to lower latency. Every modern computer has
 many cores which can run one or more threads at the same time.
 
