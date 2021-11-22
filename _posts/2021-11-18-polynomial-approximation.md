@@ -12,16 +12,18 @@ on the excellent **syn** library in Rust and Russel Thorndyke's character
 who is both a priest and smuggler on the Romney marshes.
 
 Doctor Syn's primary focus at present is to generate accurate polynomial
-approximations to functions of one variable. You are probably famililar with
+approximations to functions. You are probably famililar with
 many of the functions we are targeting:
 
 | Rust Function | calculates |
 |---------------|------------|
-| f32/f64::sin      | $$\sin{x}$$|
+| f32/f64::sin      | $$\sin{x}$$ |
 | f32/f64::cos      | $$\cos{x}$$|
 | f32/f64::atan2      | $$\arctan{y/x}$$|
 | f32/f64::exp      | $$e^x$$|
 | f32/f64::ln      | $$\log{x}$$|
+
+[See Wikipedia](https://en.wikipedia.org/wiki/C_mathematical_functions)
 
 But we are mostly focused on statistical functions such as:
 
@@ -38,7 +40,7 @@ These functions are used extensively in finance and bioinformatics to perform st
 inference to discover the parameters of models. For example, rnorm is often used to calculate
 the next step in the Metropolis-Hastings algorithm.
 
-## Surely this a solved problem?
+## Surely this is a solved problem?
 
 Whilst there are both fast or accurate versions of many of these functions, none of
 them are able utilise modern compiler technology such as autovectorisation and
@@ -56,13 +58,19 @@ be better off using fixed point integer arithmetic. Solutions that use table loo
 poor performers on 2020-era CPUs, but may get better as the **gather** instructions become
 optimised in SIMD implementations.
 
-## Our results
+Existing functions will not vectorise primarily because:
 
+* They are in shared or static libraries.
+* They contain branches and look-up tables.
 
+These things were not a problem in the 1970's when many of these functions
+were written, but today this is a problem. So we can't just inline the
+legacy functions and hope that they will vectorise because they are
+not designed to do so.
 
 ## Autovectorisation
 
-In't old days we would write our fast functions in assembler or even write assembler
+In the past we would write our fast functions in assembler or even write assembler
 to write our functions in machine code. But we like to think that we are more civilised
 now. Such functions were hard to read and impossible to improve. Many such functions
 hang around like a bad smell and more are being produced by chip vendors for special
@@ -73,20 +81,29 @@ we need a way of writing regular C or Rust code and having the compiler convert 
 SIMD code. We try to avoid writing SIMD code ourselves, these days, instead we make sure that
 our code will vectorised on modern compilers.
 
-So instead of:
+So instead of something like:
 
 ```rust
-fn inc_doubles_simd(x: &mut [f64]) {
-    for x in x.chunks_exact(4) {
-        // Some complex SIMD code
-    }
-    for x in x.chunks_exact(4).remainder() {
-        *x += 1;
+use std::arch::x86_64::*;
+
+pub fn inc_doubles_simd(x: &mut [f64]) {
+    unsafe {
+        let one = _mm256_broadcast_sd(&1.0);
+        for x in x.chunks_exact_mut(4) {
+            let a = _mm256_loadu_pd(&x[0] as *const f64);
+            let b = _mm256_add_pd(a, one);
+            _mm256_storeu_pd(&mut x[0] as *mut f64, b);
+        }
+        for x in x.chunks_exact_mut(4).into_remainder() {
+            *x += 1.0;
+        }
     }
 }
 ```
 
-we can write:
+[Godbolt](https://godbolt.org/z/TKaK1dr3v)
+
+we can simply write:
 
 ```rust
 fn inc_doubles_scalar(x: &mut [f64]) {
@@ -96,7 +113,10 @@ fn inc_doubles_scalar(x: &mut [f64]) {
 }
 ```
 
-## Vectorises or not?
+[Godbolt](https://godbolt.org/z/qG5asYMGn)
+
+This is much easier to read, works on all known hardware without modifications and
+does not specify a vector size, which might be variable.
 
 Vectorisers are fickle beasts however. If the wind blows in the wrong direction, the compiler
 will often fail to vectorise or worse - vectorise in the IR and then convert the vector
@@ -147,155 +167,36 @@ So a good maths function will often sacrifice a little accuracy - one or two bit
 to simplify the execution, but this is a choice that must be made. In the humble
 opininion of the author, if you want more accuracy, use a larger number type
 such a f64 for f32 and i64 (fixed point) for f64 calculations. This enables
-you to calculate sin and cos as a single polynomial instead of dividing
-it into quadrants.
+you to calculate functions like sin and cos as a single polynomial instead of dividing
+it into sections.
 
-## The anatomy of a vectorisable maths function
+**Doctor Syn** generates functions that are free of complex control flow
+which would inhibit vectorisation. The functions are all available as source code
+allowing inlining and as a result the chance of them inlining is much increased.
 
-Maths functions have many uses. In biology and finance, we usually want high throughputs
-of vector data, in games we usually want a low latency function at the expense of
-throughput, some uses require high accuracy and others require high performance while
-still others may operate over a limited domain.
+## Example - sampling from the normal distribution.
 
-These design choices are usually "concreted in" in library functions. Even if we
-know the input of a function will never have NaNs, we will still do a NaN check.
-Likewise the input domain may be limited.
+We tested some of our generated functions against one of the best stats distribution
+libraries in the Rust world - [rand_distr](https://docs.rs/rand_distr/0.4.2/rand_distr/).
 
-To improve this we need to offer design choices to the users of functions.
-A typical function looks like this:
+Combined with [rayon](https://docs.rs/rayon/1.5.1/rayon/) the parallel execution library
+this would have been the best choice for monte carlo experiments.
 
-```rust
-fn my_custom_function(arg: f32) -> f32 {
-    let r = domain_reduction(arg);
-    let s = domain_scaling(r);
-    let p = pole_elimination(s);
-    let x = polynomial_approximation(p);
-    let y = domain_reconstruction(x, p, arg);
-    let z = domain_checking(y, arg);
-    z
-}
-```
+We started with a uniform random number generator, based on a
+[xorshift](https://en.wikipedia.org/wiki/Xorshift) hash and tested this against
+rust's [ThreadRng](https://docs.rs/rand/0.8.4/rand/fn.thread_rng.html).
 
-Note that the function has no branches. This is important to
-help the vectorisation process along. In practice we implement
-branches using "selection" where we choose between different
-results afterwards but calculate them all anyway.
+By using a hash of an integer index instead of a sequence, we are able to
+parallelise random number generation.
 
-### Domain reduction
+|Library|Function|ns per iteration|
+|-------|----|----------------|
+|Doctor Syn|runif|xxx|
+|rand|ThreadRnd::gen()|yyy|
+|R|runif|zzz|
+|Numpy|numpy.random.uniform|qqq|
 
-`domain_reduction()` will reduce the operating domain of a function
-down to a smaller range. For example $$\sin(x) = \sin(x + 2\pi)$$
-so we can reduce x to a smaller range modulo $$2\pi$$
 
-For `exp(x)` we calulate $$2^x$$ and separate into integer and fractional
-parts. The integer part becomes the exponent and the fractional
-part goes through the polynomial to become the mantissa.
-
-### Pole elimination
-
-`pole_elimination()` uses a rational denominator to eliminate
-poles (infinites) in functions. This increases the accuracy
-for functions like $$\tan(x)$$ which has infinites at $$\pm\frac {\pi} {2}$$.
-We do this by dividing the result by $$(x-a)(x-b)...$$ where $$a$$ and $$b$$ are
-the locations of the poles. We can add more poles outside the domain
-to "straighten out" the function and reduce the size of coefficients in
-the next step.
-
-### Polynomial approximation
-
-`polynomial_approximation()` calculates a polynomial approximation
-of a function in a limited domain. If the domain is very small, a Taylor
-series can be used, but in **Doctor Syn** we use Newton polynomials
-to approximate any function, even those without Taylor series.
-
-The problem with Taylor series is that they approximate a function
-accurately only at one point, but a carefully chosen Newton polynomial
-will give accurate results over a wide range. We can improve on the
-polynomial using the Remez algorithm, but it can be highly unstable
-and usually the benefit is small.
-
-Polynomial approximations can be chose to make the result 100% accurate
-in certain places. For example $$\sin(\frac{\pi}{2})$$ should be exact.
-
-### Domain reconstruction
-
-Usually when doing the domain reduction and pole elimination, we need
-to map back into the final domain afterwards. For example when
-calculating $$\exp(x)$$ we need to reconstruct the result from
-exponent and mantissa or in a quadrant form $$\sin(x)$$ where
-we calculate $$\sin(x)$$ and $$\cos(x)$$ we need to select the
-quadrant.
-
-In the case of poles, we divide by our "pole polynomial" to
-reintroduce the poles we eliminated.
-
-### Domain checking
-
-`domain_checking()` is the process of testing the incomming
-parameters against known bounds. For example `exp(x)` has an
-operating range of roughly $$x < 710$$ beyond which we overflow
-for values $$x < -710$$ we will underflow and this needs to be
-handled.
-
-Domain checking is optional if you know that the input range
-is always satisfied, for example when calculating `logsum`
-or `softmax` in neural network execution.
-
-## Getting Rust and C to generate good code.
-
-**Doctor Syn** generates functions in Rust or C for use in
-Numpy, R or stand alone. However the code generation
-will be awful for your whole program if you do not use
-the correct environment.
-
-In Rust, we can make platform agnostic settings for `rustc`
-by including the following flags in your `.cargo/config.toml`
-
-```toml
-[build]
-rustflags = ["-C", "target-cpu=native", "-C", "opt-level=2"]
-```
-
-We can also enable specific target features on a per-function
-basis using the `target_feature` attribute:
-
-```rust
-/// Function specialised for avx2-capable cpus.
-#[target_feature(enable = "avx2")] unsafe fn foo_avx2() {
-    foo_impl()
-}
-```
-
-Other switches are possible, for example adding llvm-specific
-optimisation settings for loop interleave and vectorisation.
-
-In C, build systems are more ad-hoc and you will need to add
-compiler flags to tell your compiler to enable vectorisation
-and you may also use `__attribute__ ((__target__ ("feature")))`
-to functions. [See](https://gcc.gnu.org/onlinedocs/gcc-9.1.0/gcc/Function-Multiversioning.html)
-
-## Accuracy
-
-But is my function accurate enough? This would depend a great deal
-on what we define as accuracy.
-
-| Accuracy kind        |function|  Meaning   |
-|----------------------||--------------------|
-|Maximum absolute error|$$\max_{abs}(f(x))$$| $$\max(\|f_{approx}(x) - f_{ref}(x)\|)$$ for all x in the domain. |
-|Maximum relative error|$$\max_{rel}(f(x))$$| $$\max(\|\frac {f_{approx}(x) - f_{ref}(x)\|}{f_{ref}})$$ for all x in the domain. |
-|Unit in the Last Place error|$$ULP(f(x))$$| $$\max(\|bits(f_{approx}(x)) - bits(f_{ref}(x))\|)$$ where $$bits(x)$$ is the IEEE representation of that value. For example in hex `1.0f = 0x3f800000` and `1.0f + ULP(1.0f) = 0x3f800001`|
-
-Many library functions return either an exact $$bits(f(x))$$ or $$bits(f(x))\pm 1$$. Games-orientated functions concentrate on $$\max_{abs}(f(x))$$, usually less that $$2^{-21}$$ which makes the functions
-able to run many times faster.
-
-In practice, in statsistics the variance is usually much higher than the error in the calculation
-which cancels out statistically with many additions. Using 32 bit float in stats is perfectly fine
-if you do not sum the numbers naively - ie. sequentailly! I would challenge anyone to prove otherwise.
-With 32 bit float, we also do not need to compute so many terms for polynomials.
-
-The functions generated by **Doctor Syn** are usually comparable to **GCC libm**, but can be customised
-to be either more accurate or to run many times faster. How does **Doctor Syn** know how accurate
-**GCC libm** is? We can calculate values to 100 decimal places internally using [`BigDecimal`](https://docs.rs/bigdecimal/0.3.0/bigdecimal/).
 
 
 
