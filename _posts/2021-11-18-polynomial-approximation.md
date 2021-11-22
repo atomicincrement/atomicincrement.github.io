@@ -69,7 +69,7 @@ hang around like a bad smell and more are being produced by chip vendors for spe
 architectures. Excellent libraries like [Sleef](https://github.com/shibatch/sleef/blob/master/src/arch/helperavx512f.h) are done this way with machine specific intrinsics .
 
 But to make our code portable, for example to run on the new ARM SVE with variable sized registers,
-we need a wy of writing regular C or Rust code and having the compiler convert our loops into
+we need a way of writing regular C or Rust code and having the compiler convert our loops into
 SIMD code. We try to avoid writing SIMD code ourselves, these days, instead we make sure that
 our code will vectorised on modern compilers.
 
@@ -238,7 +238,7 @@ for values $$x < -710$$ we will underflow and this needs to be
 handled.
 
 Domain checking is optional if you know that the input range
-is always satisfied, for example when calculaing `logsum`
+is always satisfied, for example when calculating `logsum`
 or `softmax` in neural network execution.
 
 ## Getting Rust and C to generate good code.
@@ -279,11 +279,11 @@ to functions. [See](https://gcc.gnu.org/onlinedocs/gcc-9.1.0/gcc/Function-Multiv
 But is my function accurate enough? This would depend a great deal
 on what we define as accuracy.
 
-| Accuracy kind        |function|  Meaning           |
+| Accuracy kind        |function|  Meaning   |
 |----------------------||--------------------|
 |Maximum absolute error|$$\max_{abs}(f(x))$$| $$\max(\|f_{approx}(x) - f_{ref}(x)\|)$$ for all x in the domain. |
 |Maximum relative error|$$\max_{rel}(f(x))$$| $$\max(\|\frac {f_{approx}(x) - f_{ref}(x)\|}{f_{ref}})$$ for all x in the domain. |
-|Unit in the Last Place error|$$ULP(f(x))$$| $$\max(\|bits(f_{approx}(x)) - bits(f_{ref}(x))\|)$$ where $$bits(x)$$ is the IEEE representation of that value. For example, `1.0f = 0x3fe0000` and `1.0f + ULP(1.0f) = 0x3fe0001`|
+|Unit in the Last Place error|$$ULP(f(x))$$| $$\max(\|bits(f_{approx}(x)) - bits(f_{ref}(x))\|)$$ where $$bits(x)$$ is the IEEE representation of that value. For example in hex `1.0f = 0x3f800000` and `1.0f + ULP(1.0f) = 0x3f800001`|
 
 Many library functions return either an exact $$bits(f(x))$$ or $$bits(f(x))\pm 1$$. Games-orientated functions concentrate on $$\max_{abs}(f(x))$$, usually less that $$2^{-21}$$ which makes the functions
 able to run many times faster.
