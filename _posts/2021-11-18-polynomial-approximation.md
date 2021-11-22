@@ -127,84 +127,10 @@ Each call will take several hundred cycles.
 
 ## Making library functions that vectorise
 
-So how can we make code snippets like the above
-vectorise? One way is to get LLVM, the backend to Rust and
-many other languages, make calls to "vector" versions
-of the library. Indeed LLVM has support for vector versions
-of sin, cos etc.
-
-This is a good idea except for one major flaw. Any
-calls to libraries that do not inline will suffer from
-latency issues.
-
-To understand why this is the case, you have to understand
-latency in instructions.
-
-Say we have some code like this:
-
-```rust
-pub fn latency(x: f32) -> f32 {
-    let x = x + 1.0;
-    let x = x * 20.0;
-    let x = x * x;
-    x
-}
-```
-
-```
-example::latency:
-        vaddss  xmm0, xmm0, dword ptr [rip + .LCPI0_0]
-        vmulss  xmm0, xmm0, dword ptr [rip + .LCPI0_1]
-        vmulss  xmm0, xmm0, xmm0
-        ret
-```
-
-Here we execute three instructions, but their latency
-is usually more than one cycle - four is common.
-
-This means that there is a long wait between the instructions
-like this:
-
-```
-example::latency:
-        vaddss  xmm0, xmm0, dword ptr [rip + .LCPI0_0]
-        # wait of 3 cycles
-        vmulss  xmm0, xmm0, dword ptr [rip + .LCPI0_1]
-        # wait of 3 cycles
-        vmulss  xmm0, xmm0, xmm0
-        # wait of 3 cycles
-        ret
-```
-
-Assuming the call is invisible, this means we get a throughput of
-`1/(3 x 4) = 1/12` operations per cycle or `4/(3 x 4) = 1/3` for
-vectors of 4 elements. This is four times slower than we
-can achieve with inline code, which can unroll loops to get
-more throughput, a technique called **interleaving**.
-
-A better function would look like the following using dense groups
-of four vector instructions with a throughput of `8 x 4 / 12 = 8 / 3`
-operations per cycle.
-
-```
-example::latency2:
-        vaddps  ymm0, ymm0, dword ptr [rip + .LCPI0_0]
-        vaddps  ymm1, ymm1, dword ptr [rip + .LCPI0_0]
-        vaddps  ymm2, ymm2, dword ptr [rip + .LCPI0_0]
-        vaddps  ymm3, ymm3, dword ptr [rip + .LCPI0_0]
-        vmulps  ymm0, ymm0, dword ptr [rip + .LCPI0_1]
-        vmulps  ymm1, ymm1, dword ptr [rip + .LCPI0_1]
-        vmulps  ymm2, ymm2, dword ptr [rip + .LCPI0_1]
-        vmulps  ymm3, ymm3, dword ptr [rip + .LCPI0_1]
-        vmulps  ymm0, ymm0, ymm0
-        vmulps  ymm0, ymm0, ymm0
-        vmulps  ymm0, ymm0, ymm0
-        vmulps  ymm0, ymm0, ymm0
-        ret
-```
-
-Library functions also make things bad for themselves by introducing
-branching. To get better accuracy, they divide the domain
+Library functions make things bad for themselves by introducing
+branching.
+So even if we can inline the function, the functions will not vectorise.
+To get better accuracy, they divide the domain
 of a function - for example $$[-\pi, \pi]$$ for $$\sin(x)$$ into many small
 parts. This is often done using a `switch` statement which will not vectorise.
 Alternatives include using a lookup table of coefficients but many CPUs have not yet
