@@ -217,12 +217,35 @@ So a good maths function will often sacrifice a little accuracy - one or two bit
 to simplify the execution, but this is a choice that must be made. In the humble
 opininion of the author, if you want more accuracy, use a larger number type
 such a f64 for f32 and i64 (fixed point) for f64 calculations. This enables
-you to calculate sin and cos as a single polynomial.
+you to calculate sin and cos as a single polynomial instead of dividing
+it into quadrants.
 
+## The anatomy of a vectorisable maths function
 
+Maths functions have many uses. In biology and finance, we usually want high trhoughputs
+of vector data, in games we usually want a low latency function at the expense of
+throughput, some uses require high accuracy and others require high performance while
+still others may operate over a limited domain.
 
+These design choices are usually "concreted in" in library functions. Even if we
+know the input of a function will never have NaNs, we will still do a NaN check.
+Likewise the input domain may be limited.
 
+A typical function looks like this:
 
+```rust
+fn my_custom_function(x: f32) -> f32 {
+    if let Some(nan) = domain_checking(x) {
+        return nan;
+    }
+    let r = domain_reduction(x);
+    let s = domain_scaling(r);
+    let x = polynomial_approximation(s);
+    let y = domain_selection(x);
+    y
+}
+```
 
-
-
+`domain_checking` is the process of testing the incomming
+parameters against known bounds. For example `exp(x)` has an
+operating range of roughly $$x < 710$$ beyond which we overflow.
