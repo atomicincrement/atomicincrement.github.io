@@ -235,30 +235,21 @@ To improve this we need to offer design choices to the users of functions.
 A typical function looks like this:
 
 ```rust
-fn my_custom_function(x: f32) -> f32 {
-    if let Some(nan) = domain_checking(x) {
-        return nan;
-    }
-    let r = domain_reduction(x);
+fn my_custom_function(arg: f32) -> f32 {
+    let r = domain_reduction(arg);
     let s = domain_scaling(r);
     let p = pole_elimination(s);
     let x = polynomial_approximation(p);
-    let y = domain_reconstruction(x);
-    y
+    let y = domain_reconstruction(x, p, arg);
+    let z = domain_checking(y, arg);
+    z
 }
 ```
 
-### Domain checking
-
-`domain_checking()` is the process of testing the incomming
-parameters against known bounds. For example `exp(x)` has an
-operating range of roughly $$x < 710$$ beyond which we overflow
-for values $$x < -710$$ we will underflow and this needs to be
-handled.
-
-Domain checking is optional if you know that the input range
-is always satisfied, for example when calculaing `logsum`
-or `softmax` in neural network execution.
+Note that the function has no branches. This is important to
+help the vectorisation process along. In practice we implement
+branches using "selection" where we choose between different
+results afterwards but calculate them all anyway.
 
 ### Domain reduction
 
@@ -307,4 +298,16 @@ quadrant.
 
 In the case of poles, we divide by our "pole polynomial" to
 reintroduce the poles we eliminated.
+
+### Domain checking
+
+`domain_checking()` is the process of testing the incomming
+parameters against known bounds. For example `exp(x)` has an
+operating range of roughly $$x < 710$$ beyond which we overflow
+for values $$x < -710$$ we will underflow and this needs to be
+handled.
+
+Domain checking is optional if you know that the input range
+is always satisfied, for example when calculaing `logsum`
+or `softmax` in neural network execution.
 
