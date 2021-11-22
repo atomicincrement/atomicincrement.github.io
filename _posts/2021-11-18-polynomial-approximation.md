@@ -222,7 +222,7 @@ it into quadrants.
 
 ## The anatomy of a vectorisable maths function
 
-Maths functions have many uses. In biology and finance, we usually want high trhoughputs
+Maths functions have many uses. In biology and finance, we usually want high throughputs
 of vector data, in games we usually want a low latency function at the expense of
 throughput, some uses require high accuracy and others require high performance while
 still others may operate over a limited domain.
@@ -231,6 +231,7 @@ These design choices are usually "concreted in" in library functions. Even if we
 know the input of a function will never have NaNs, we will still do a NaN check.
 Likewise the input domain may be limited.
 
+To improve this we need to offer design choices to the users of functions.
 A typical function looks like this:
 
 ```rust
@@ -240,12 +241,70 @@ fn my_custom_function(x: f32) -> f32 {
     }
     let r = domain_reduction(x);
     let s = domain_scaling(r);
-    let x = polynomial_approximation(s);
-    let y = domain_selection(x);
+    let p = pole_elimination(s);
+    let x = polynomial_approximation(p);
+    let y = domain_reconstruction(x);
     y
 }
 ```
 
-`domain_checking` is the process of testing the incomming
+### Domain checking
+
+`domain_checking()` is the process of testing the incomming
 parameters against known bounds. For example `exp(x)` has an
-operating range of roughly $$x < 710$$ beyond which we overflow.
+operating range of roughly $$x < 710$$ beyond which we overflow
+for values $$x < -710$$ we will underflow and this needs to be
+handled.
+
+Domain checking is optional if you know that the input range
+is always satisfied, for example when calculaing `logsum`
+or `softmax` in neural network execution.
+
+### Domain reduction
+
+`domain_reduction()` will reduce the operating domain of a function
+down to a smaller range. For example $$\sin(x) = \sin(x + 2\pi)$$
+so we can reduce x to a smaller range modulo $$2\pi$$
+
+For `exp(x)` we calulate $$2^x$$ and separate into integer and fractional
+parts. The integer part becomes the exponent and the fractional
+part goes through the polynomial to become the mantissa.
+
+### Pole elimination
+
+`pole_elimination()` uses a rational denominator to eliminate
+poles (infinites) in functions. This increases the accuracy
+for functions like $$\tan(x)$$ which has infinites at $$\pm\frac {\pi} {2}$$.
+We do this by dividing the result by $$(x-a)(x-b)...$$ where $$a$$ and $$b$$ are
+the locations of the poles. We can add more poles outside the domain
+to "straighten out" the function and reduce the size of coefficients in
+the next step.
+
+### Polynomial approximation
+
+`polynomial_approximation()` calculates a polynomial approximation
+of a function in a limited domain. If the domain is very small, a Taylor
+series can be used, but in **Doctor Syn** we use Newton polynomials
+to approximate any function, even those without Taylor series.
+
+The problem with Taylor series is that they approximate a function
+accurately only at one point, but a carefully chosen Newton polynomial
+will give accurate results over a wide range. We can improve on the
+polynomial using the Remez algorithm, but it can be highly unstable
+and usually the benefit is small.
+
+Polynomial approximations can be chose to make the result 100% accurate
+in certain places. For example $$\sin(\frac{\pi}{2})$$ should be exact.
+
+### Domain reconstruction
+
+Usually when doing the domain reduction and pole elimination, we need
+to map back into the final domain afterwards. For example when
+calculating $$\exp(x)$$ we need to reconstruct the result from
+exponent and mantissa or in a quadrant form $$\sin(x)$$ where
+we calculate $$\sin(x)$$ and $$\cos(x)$$ we need to select the
+quadrant.
+
+In the case of poles, we divide by our "pole polynomial" to
+reintroduce the poles we eliminated.
+
