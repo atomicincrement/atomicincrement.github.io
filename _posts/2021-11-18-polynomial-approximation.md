@@ -92,22 +92,137 @@ fn inc_doubles_scalar(x: &mut [f64]) {
 }
 ```
 
-## Here be dinosuars.
+## Vectorises or not?
 
-Vectorisers are fickle beasts however. Great personalities with rather conservative views
-dominate the open source compiler world and to them "correctness" is the most important thing,
-whatever that may be - everyone disagrees. As a result, compilers often fail to vectorise innocent looking
-loops resulting in drastic code slowdowns that are hard to diagnose.
+Vectorisers are fickle beasts however. If the wind blows in the wrong direction, the compiler
+will often fail to vectorise or worse - vectorise in the IR and then convert the vector
+operations to a long series of library calls.
 
-For us, we just want our code to not take hours to run and consume a small nation's worth of power
-in doing so and don't care much if two computer architectures get a different result in the 52nd bit
-after all floating point is approximate after all and those who forget that will pay the price.
+For example, the following rather innocent function, which absolutely should be vectorisable,
+converts itself into a series of function calls:
 
-A classic example of this is **fused multiply add** which multiplies two numbers and
-accumulates the result. There are special instructions on almost every CPU that will do this
-and the result will not only be faster but more accurate also.
+```rust
+pub fn vector_sin(d: &mut [f64]) {
+    d.iter_mut().for_each(|d| *d = f64::sin(*d))
+}
+```
 
-In Rust we can use the `.mul_add()` function on `f64` and `f32` types to do this explictly,
-even in stable Rust. When calculating functions we get both more accuracy and more performance,
-*win win!*
+[Goldbolt](https://godbolt.org/z/x4jr6MdM3) gives:
+
+```
+.LBB0_6:
+        vmovsd  xmm0, qword ptr [r15 + 8*r12]
+        vmovsd  qword ptr [rsp], xmm0
+        vmovsd  xmm0, qword ptr [r15 + 8*r12 + 8]
+        call    r14
+        ... and 7 more calls like this.
+        vunpcklpd       xmm0, xmm0, xmmword ptr [rsp]
+        vmovups xmmword ptr [r15 + 8*r12 + 48], xmm0
+        add     r12, 8
+        add     rbp, 4
+        jne     .LBB0_6
+```
+
+Each call will take several hundred cycles.
+
+## Making library functions that vectorise
+
+So how can we make code snippets like the above
+vectorise? One way is to get LLVM, the backend to Rust and
+many other languages, make calls to "vector" versions
+of the library. Indeed LLVM has support for vector versions
+of sin, cos etc.
+
+This is a good idea except for one major flaw. Any
+calls to libraries that do not inline will suffer from
+latency issues.
+
+To understand why this is the case, you have to understand
+latency in instructions.
+
+Say we have some code like this:
+
+```rust
+pub fn latency(x: f32) -> f32 {
+    let x = x + 1.0;
+    let x = x * 20.0;
+    let x = x * x;
+    x
+}
+```
+
+```
+example::latency:
+        vaddss  xmm0, xmm0, dword ptr [rip + .LCPI0_0]
+        vmulss  xmm0, xmm0, dword ptr [rip + .LCPI0_1]
+        vmulss  xmm0, xmm0, xmm0
+        ret
+```
+
+Here we execute three instructions, but their latency
+is usually more than one cycle - four is common.
+
+This means that there is a long wait between the instructions
+like this:
+
+```
+example::latency:
+        vaddss  xmm0, xmm0, dword ptr [rip + .LCPI0_0]
+        # wait of 3 cycles
+        vmulss  xmm0, xmm0, dword ptr [rip + .LCPI0_1]
+        # wait of 3 cycles
+        vmulss  xmm0, xmm0, xmm0
+        # wait of 3 cycles
+        ret
+```
+
+Assuming the call is invisible, this means we get a throughput of
+`1/(3 x 4) = 1/12` operations per cycle or `4/(3 x 4) = 1/3` for
+vectors of 4 elements. This is four times slower than we
+can achieve with inline code, which can unroll loops to get
+more throughput, a technique called **interleaving**.
+
+A better function would look like the following using dense groups
+of four vector instructions with a throughput of `8 x 4 / 12 = 8 / 3`
+operations per cycle.
+
+```
+example::latency2:
+        vaddps  ymm0, ymm0, dword ptr [rip + .LCPI0_0]
+        vaddps  ymm1, ymm1, dword ptr [rip + .LCPI0_0]
+        vaddps  ymm2, ymm2, dword ptr [rip + .LCPI0_0]
+        vaddps  ymm3, ymm3, dword ptr [rip + .LCPI0_0]
+        vmulps  ymm0, ymm0, dword ptr [rip + .LCPI0_1]
+        vmulps  ymm1, ymm1, dword ptr [rip + .LCPI0_1]
+        vmulps  ymm2, ymm2, dword ptr [rip + .LCPI0_1]
+        vmulps  ymm3, ymm3, dword ptr [rip + .LCPI0_1]
+        vmulps  ymm0, ymm0, ymm0
+        vmulps  ymm0, ymm0, ymm0
+        vmulps  ymm0, ymm0, ymm0
+        vmulps  ymm0, ymm0, ymm0
+        ret
+```
+
+Library functions also make things bad for themselves by introducing
+branching. To get better accuracy, they divide the domain
+of a function - for example $$[-\pi, \pi]$$ for $$\sin(x)$$ into many small
+parts. This is often done using a `switch` statement which will not vectorise.
+Alternatives include using a lookup table of coefficients but many CPUs have not yet
+implemented an efficient `gather` operation which can do table lookups
+in reasonable time. The exception to this is GPUs, which do commonly
+have efficient `gather` but these are likely to hurt the cache performance
+unless you use non-temporal loads and stores.
+
+So a good maths function will often sacrifice a little accuracy - one or two bits
+to simplify the execution, but this is a choice that must be made. In the humble
+opininion of the author, if you want more accuracy, use a larger number type
+such a f64 for f32 and i64 (fixed point) for f64 calculations. This enables
+you to calculate sin and cos as a single polynomial.
+
+
+
+
+
+
+
 
