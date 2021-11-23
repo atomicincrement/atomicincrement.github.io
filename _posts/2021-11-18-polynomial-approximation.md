@@ -37,8 +37,8 @@ While improving these functions has a lot of value, we are currently focusing mo
 [See the R documention](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/Normal.html)
 
 These functions are used extensively in finance and bioinformatics to perform statistical
-inference to discover the parameters of models. For example, rnorm is often used to calculate
-the next step in the Metropolis-Hastings algorithm or to simulate option pricing.
+inference, stochastic modelling, AI and Machine learning. For example, rnorm is a key part of many
+MCMC algorithms and variational techniques, as well as a key part of monte carlo simulations, such as those that may be used to solve stochastic differential equations.
 
 Using this libary, combined with parallel iterators, we can generate more efficent versions of
 
