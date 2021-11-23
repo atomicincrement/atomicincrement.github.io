@@ -262,20 +262,8 @@ on a four core laptop and about 30x for numpy.
 
 ## Work to do
 
-Whilst we clearly have a significant performance boost
-over even the best-in-class Rust distribution system,
-we still have some work to do.
+With an implementation of just two Doctor Syn functions, we have shown a significant performance boost
+over even the best-in-class Rust distribution system. This excellent result on a toy example shows excellent promise for what the generalised **Doctor Syn** system is capable of. 
 
-To prove the system, we need to do considerable verification
-work on the methods as well as generate R, python and GNU octave
-libraries.
+Work has started on support for ARM SVE, with work on the (Isambard)[https://gw4.ac.uk/isambard/] A64FX supercomputing cluster underway. The Doctor Syn method also provides flexibility in the accuracy of the solution it provides, and we are exploring super-accurate versions of our functions by using larger sizes, table lookups or fixed point integer arithmetic. Finally, we are working on the substantial task of full verification as well as generation of R, python and Octave libraries. 
 
-There are many other functions which will benefit from the
-generalised system that **Doctor Syn** supports.
-
-We should also look at super-accurate versions of these functions
-by using larger sizes, table lookups or fixed point integer
-arithmetic.
-
-Work has started on support for ARM SVE, with work on the Isambard
-A64FX cluster underway.
