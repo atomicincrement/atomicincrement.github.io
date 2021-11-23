@@ -7,7 +7,7 @@ categories: maths
 
 ## Doctor Syn
 
-Recently I have been working on a Rust library called "Doctor Syn", a play
+Recently we have been working on a Rust library called "Doctor Syn", a play
 on the excellent **syn** library in Rust and Russel Thorndyke's character
 who is both a priest and smuggler on the Romney marshes.
 
@@ -38,7 +38,19 @@ But we are mostly focused on statistical functions such as:
 
 These functions are used extensively in finance and bioinformatics to perform statistical
 inference to discover the parameters of models. For example, rnorm is often used to calculate
-the next step in the Metropolis-Hastings algorithm.
+the next step in the Metropolis-Hastings algorithm or to simulate option pricing.
+
+Using this libary, combined with parallel iterators, we can generate more efficent versions of
+
+* Numpy
+* R
+* GNU Octave
+
+and many others.
+
+We can also target new architectures like Arm SVE which do not fit the X86 model.
+We are working with the Isambard A64FX cluster to attempt to improve existing
+algorithms.
 
 ## Surely this is a solved problem?
 
@@ -101,7 +113,7 @@ pub fn inc_doubles_simd(x: &mut [f64]) {
 }
 ```
 
-[Godbolt](https://godbolt.org/z/TKaK1dr3v)
+[Godbolt](https://godbolt.org/z/87eeadoej)
 
 we can simply write:
 
@@ -187,17 +199,83 @@ We started with a uniform random number generator, based on a
 rust's [ThreadRng](https://docs.rs/rand/0.8.4/rand/fn.thread_rng.html).
 
 By using a hash of an integer index instead of a sequence, we are able to
-parallelise random number generation.
+    parallelise random number generation.
 
-|Library|Function|ns per iteration|
+```
+pub fn runif(index: usize) -> f64 {
+    let mut z = (index + 1) as u64 * 0x9e3779b97f4a7c15;
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+    z = z ^ (z >> 31);
+    from_bits((z >> 2) | 0x3ff0000000000000_u64) - 1.0
+}
+```
+
+|Library|Function|ns per iteration (smaller is better)|
 |-------|----|----------------|
-|Doctor Syn|runif|xxx|
-|rand|ThreadRnd::gen()|yyy|
-|R|runif|zzz|
-|Numpy|numpy.random.uniform|qqq|
+|Doctor Syn|runif|0.8|
+|Doctor Syn|parallel runif|0.6|
+|rand|ThreadRnd::gen()|5.1|
+|rand|parallel ThreadRnd::gen()|2.1|
+|R|runif|20.0|
+|Numpy|numpy.random.uniform|13.0|
 
+So clearly, we do well against even the best Rust version and
+much better (over 20 times better) than R and Numpy.
 
+Moving to normal random number generation, we use the quantile (or probit) function
+to shape the random variable:
 
+```
+fn qnorm(arg: fty) -> fty {
+    let scaled: fty = arg - 0.5;
+    let x = scaled;
+    let recip: fty = 1.0 / (x * x - 0.5 * 0.5);
+    let y: fty = (from_bits(4730221388428958202u64))
+        .mul_add(x * x, -from_bits(4731626383781768040u64))
+        .mul_add(x * x, from_bits(4727627778628654481u64))
+        .mul_add(x * x, -from_bits(4720012863723153492u64))
+        .mul_add(x * x, from_bits(4708869911609092829u64))
+        .mul_add(x * x, -from_bits(4695087533321972728u64))
+        .mul_add(x * x, from_bits(4678670384600451257u64))
+        .mul_add(x * x, -from_bits(4658680898319303328u64))
+        .mul_add(x * x, from_bits(4635605149421499302u64))
+        .mul_add(x * x, from_bits(4578476110820645018u64))
+        .mul_add(x * x, from_bits(4611041379213747643u64))
+        .mul_add(x * x, -from_bits(4603819697584151827u64))
+        * x;
+    y * recip
+}
+```
 
+|Library|Function|ns per iteration (smaller is better)|
+|-------|----|----------------|
+|Doctor Syn|rnorm|2.4|
+|Doctor Syn|parallel rnorm|0.9|
+|rand|ThreadRnd::gen()|6.9|
+|rand|parallel ThreadRnd::gen()|1.7|
+|R|rnorm|60.0|
+|Numpy|numpy.random.uniform|31.9|
 
+So more than 60x speedup over the R version
+on a four core laptop.
 
+## Work to do
+
+Whilst we clearly have a significant performance boost
+over even the best-in-class Rust distribution system,
+we still have some work to do.
+
+To prove the system, we need to do considerable verification
+work on the methods as well as generate R, python and GNU octave
+libraries.
+
+There are many other functions which will benefit from the
+generalised system that **Doctor Syn** supports.
+
+We should also look at super-accurate versions of these functions
+by using larger sizes, table lookups or fixed point integer
+arithmetic.
+
+Work has started on support for ARM SVE, with work on the Isambard
+A64FX cluster underway.
