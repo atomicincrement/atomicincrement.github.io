@@ -8,7 +8,7 @@ categories: maths
 ## Doctor Syn
 
 Recently we have been working on a Rust library called "Doctor Syn", a play
-on the excellent **syn** library in Rust and Russel Thorndyke's character
+on the excellent (syn)[https://docs.rs/syn/1.0.81/syn/] library in Rust and (Russel Thorndyke's character)[https://en.wikipedia.org/wiki/Doctor_Syn]
 who is both a priest and smuggler on the Romney marshes.
 
 Doctor Syn's primary focus at present is to generate accurate polynomial
