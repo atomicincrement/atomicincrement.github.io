@@ -252,13 +252,13 @@ fn qnorm(arg: fty) -> fty {
 |-------|----|----------------|
 |Doctor Syn|rnorm|2.4|
 |Doctor Syn|parallel rnorm|0.9|
-|rand|ThreadRnd::gen()|6.9|
-|rand|parallel ThreadRnd::gen()|1.7|
+|rand_distr|Normal::sample()|6.9|
+|rand_distr|parallel Normal::sample()|1.7|
 |R|rnorm|60.0|
 |Numpy|numpy.random.uniform|31.9|
 
 So more than 60x speedup over the R version
-on a four core laptop.
+on a four core laptop and about 30x for numpy.
 
 ## Work to do
 
