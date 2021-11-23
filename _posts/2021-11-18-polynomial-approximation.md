@@ -82,11 +82,8 @@ not designed to do so.
 
 ## Autovectorisation
 
-In the past we would write our fast functions in assembler or even write assembler
-to write our functions in machine code. But we like to think that we are more civilised
-now. Such functions were hard to read and impossible to improve. Many such functions
-hang around like a bad smell and more are being produced by chip vendors for special
-architectures. Excellent libraries like [Sleef](https://github.com/shibatch/sleef/blob/master/src/arch/helperavx512f.h) are done this way with machine specific intrinsics .
+In the past we have implemented fast functions in assembler or even written assembler
+to write functions in machine code. These days however, we often try to take a more "civilized" approach where possible. Assembler functions are fast, but difficult to read, difficult to improve, and difficult to generalize. Despite these problems, many such functions end up hanging around like a bad smell, and more are being produced by chip vendors for special architectures. Even excellent libraries like [Sleef](https://github.com/shibatch/sleef/blob/master/src/arch/helperavx512f.h) are done this way with machine specific intrinsics.
 
 But to make our code portable, for example to run on the new ARM SVE with variable sized registers,
 we need a way of writing regular C or Rust code and having the compiler convert our loops into
