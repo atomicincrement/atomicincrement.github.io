@@ -25,7 +25,7 @@ many of the functions we are targeting:
 
 [See Wikipedia](https://en.wikipedia.org/wiki/C_mathematical_functions)
 
-But we are mostly focused on statistical functions such as:
+While improving these functions has a lot of value, we are currently focusing most of our effort on statistical functions such as:
 
 | R Function | distribution | role | calculates |
 |------------|--------------|------------|
