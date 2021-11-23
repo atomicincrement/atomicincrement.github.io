@@ -12,7 +12,7 @@ on the excellent (syn)[https://docs.rs/syn/1.0.81/syn/] library in Rust and (Rus
 who is both a priest and smuggler on the Romney marshes.
 
 Doctor Syn's primary focus at present is to generate accurate polynomial
-approximations to functions. You are probably famililar with
+approximations to key functions important to the execution of many programs. You are probably familiar with
 many of the functions we are targeting:
 
 | Rust Function | calculates |
