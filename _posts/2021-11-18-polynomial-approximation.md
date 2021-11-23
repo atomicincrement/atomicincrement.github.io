@@ -54,10 +54,7 @@ algorithms.
 
 ## Surely this is a solved problem?
 
-Whilst there are both fast or accurate versions of many of these functions, none of
-them are able utilise modern compiler technology such as autovectorisation and
-thread based parallelism efficiently. Also there are no fast *and* accurate versions
-of these functions, so we usually have to pick one.
+While great effort has been expended in key function optimization, current techniques are unable to efficiently utilize   modern compiler technology such as auto-vectorisation and thread based parallelism. This leads to the situation in which users are forced to trade off accuracy and speed, with no implementation that is both *fast* and *accurate*.
 
 [See this for an example of *accurate*](https://blog.sigplan.org/2021/08/26/high-performance-correctly-rounded-math-libraries-for-32-bit-floating-point-representations/)
 
