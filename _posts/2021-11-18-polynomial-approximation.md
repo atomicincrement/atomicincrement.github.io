@@ -85,10 +85,7 @@ not designed to do so.
 In the past we have implemented fast functions in assembler or even written assembler
 to write functions in machine code. These days however, we often try to take a more "civilized" approach where possible. Assembler functions are fast, but difficult to read, difficult to improve, and difficult to generalize. Despite these problems, many such functions end up hanging around like a bad smell, and more are being produced by chip vendors for special architectures. Even excellent libraries like [Sleef](https://github.com/shibatch/sleef/blob/master/src/arch/helperavx512f.h) are done this way with machine specific intrinsics.
 
-But to make our code portable, for example to run on the new ARM SVE with variable sized registers,
-we need a way of writing regular C or Rust code and having the compiler convert our loops into
-SIMD code. We try to avoid writing SIMD code ourselves, these days, instead we make sure that
-our code will vectorised on modern compilers.
+To solve the problems with these architecture specific assembly implementations, we try and write portable code; we wish our code to be able to run on both x86 architectures with SIMD as well as the new ARM SVE with variable sized registers. The way we achieve this is by trying to write code in such a way as that it will be automatically vectorised by modern compilers.
 
 So instead of something like:
 
