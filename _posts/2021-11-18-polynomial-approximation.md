@@ -72,10 +72,9 @@ Existing functions will not vectorise primarily because:
 * They are in shared or static libraries.
 * They contain branches and look-up tables.
 
-These things were not a problem in the 1970's when many of these functions
-were written, but today this is a problem. So we can't just inline the
-legacy functions and hope that they will vectorise because they are
-not designed to do so.
+In the 1970's when many of these functions were written, this was the state of the art. Today however, this is a problem: with the advances of modern vectorising processors, these implementations are substantially less efficient than they could be.
+
+There is no short and simple fix to this problem either, these problems are fundamental ones that preclude any efficient vectorisation. The only viable approach to this problem is with substantial and novel changes such as the one that Doctor Syn proposes.
 
 ## Autovectorisation
 
