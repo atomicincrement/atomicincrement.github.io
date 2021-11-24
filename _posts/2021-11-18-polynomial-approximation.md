@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Making faster stats functions."
+title:  "Breaking the AI sound barrier with Doctor Syn."
 date:   2021-11-18
 categories: maths
 ---
@@ -164,13 +164,6 @@ implemented an efficient `gather` operation which can do table lookups
 in reasonable time. The exception to this is GPUs, which do commonly
 have efficient `gather` but these are likely to hurt the cache performance
 unless you use non-temporal loads and stores.
-
-So a good maths function will often sacrifice a little accuracy - one or two bits
-to simplify the execution, but this is a choice that must be made. In the humble
-opininion of the author, if you want more accuracy, use a larger number type
-such a f64 for f32 and i64 (fixed point) for f64 calculations. This enables
-you to calculate functions like sin and cos as a single polynomial instead of dividing
-it into sections.
 
 **Doctor Syn** generates functions that are free of complex control flow
 which would inhibit vectorisation. The functions are all available as source code
