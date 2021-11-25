@@ -57,20 +57,23 @@ architecture as SVE has a variable length SIMD architecture which will run
 the same binary on many different word-length machines. SVE requires
 Autovectorisation to work effectively.
 
-## Surely this is a solved problem?
+## The AI sound barrier
 
-While great effort has been expended in key function optimization, current techniques are unable to efficiently utilize   modern compiler technology such as auto-vectorisation and thread based parallelism. This leads to the situation in which users are forced to trade off accuracy and speed, with no implementation that is both *fast* and *accurate*.
+While great effort has been expended in key function optimization, current techniques are unable to efficiently utilize modern compiler technology such as auto-vectorisation and thread based parallelism. This leads to the situation in which users are forced to trade off accuracy and speed, with no implementation that is both *fast* and *accurate*.
 
 [See this for an example of *accurate*](https://blog.sigplan.org/2021/08/26/high-performance-correctly-rounded-math-libraries-for-32-bit-floating-point-representations/)
 
 [See this discussion on *fast* on Stack Overflow](https://stackoverflow.com/questions/18662261/fastest-implementation-of-sine-cosine-and-square-root-in-c-doesnt-need-to-b)
 
-If you really need to be accurate, it is best not to use floating point at all or to use
-a larger floating point type than the one you are calculating. For example for **float16** use
-**float32** to do the calculation and for **float32** use **float64**. For **float64** you will
-be better off using fixed point integer arithmetic. Solutions that use table lookup are very
-poor performers on 2020-era CPUs, but may get better as the **gather** instructions become
-optimised in SIMD implementations.
+The result is usually a compromise and this has been the status quo for several
+decades now. In fact there have been very few improvements to math libraries
+since apart from hand-written assembler versions of older functions. This has
+created a "sound barrier" that has yet to be broken where AI code is limited
+to a certain performance. To go faster, you will need to buy expensive GPU
+hardware that consumes enormous amounts of power and then your
+benefit will be minimal.
+
+## The challenge of vectorisation.
 
 Existing functions will not vectorise primarily because:
 
