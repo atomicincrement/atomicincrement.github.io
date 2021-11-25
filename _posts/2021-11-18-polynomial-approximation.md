@@ -34,13 +34,13 @@ While improving these functions has a lot of value, we are currently focusing mo
 | qnorm      | normal | quantile | $$\mu+\sigma\sqrt{2} \operatorname{erf}^{-1}(2p-1)$$|
 | rnorm      | normal | random | $$ \operatorname{qnorm}(\operatorname{runif}(i)) $$|
 
-[See the R documention](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/Normal.html)
+[See the R documentation](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/Normal.html)
 
 These functions are used extensively in finance and bioinformatics to perform statistical
 inference, stochastic modelling, AI and Machine learning. For example, rnorm is a key part of many
 MCMC algorithms and variational techniques, as well as a key part of monte carlo simulations, such as those that may be used to solve stochastic differential equations.
 
-Using this libary, combined with parallel iterators, we can generate more efficent versions of
+Using this library, combined with parallel iterators, we can generate more efficient versions of
 
 * Numpy
 * R
@@ -51,6 +51,11 @@ and many others.
 We can also target new architectures like Arm SVE which do not fit the X86 model.
 We are working with the Isambard A64FX cluster to attempt to improve existing
 algorithms.
+
+This approach to function generation should fit perfectly with the A64FX's SVE
+architecture as SVE has a variable length SIMD architecture which will run
+the same binary on many different word-length machines. SVE requires
+Autovectorisation to work effectively.
 
 ## Surely this is a solved problem?
 
