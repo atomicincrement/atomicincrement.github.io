@@ -7,13 +7,17 @@ categories: maths
 
 ## Doctor Syn
 
-Recently we have been working on a Rust library called "Doctor Syn", a play
-on the excellent (syn)[https://docs.rs/syn/1.0.81/syn/] library in Rust and (Russel Thorndyke's character)[https://en.wikipedia.org/wiki/Doctor_Syn]
-who is both a priest and smuggler on the Romney marshes.
+The problem facing the AI industry today is that many of the functions at
+the heart of machine learning processes were written over forty years ago
+when computer hardware and compiler technology were very different.
+
+Our library, Doctor Syn, addresses this problem by using the three technologies
+of SIMD, multithreading and autovectorisation. We achieve 30x or more speedups
+over traditional libraries in C, C++, Rust and Fortran, without making the code
+platform or language specific.
 
 Doctor Syn's primary focus at present is to generate accurate polynomial
-approximations to key functions important to the execution of many programs. You are probably familiar with
-many of the functions we are targeting:
+approximations to key functions important to the execution of many programs. You are probably familiar with many of the functions we are targeting:
 
 | Rust Function | calculates |
 |---------------|------------|
@@ -40,7 +44,7 @@ These functions are used extensively in finance and bioinformatics to perform st
 inference, stochastic modelling, AI and Machine learning. For example, rnorm is a key part of many
 MCMC algorithms and variational techniques, as well as a key part of monte carlo simulations, such as those that may be used to solve stochastic differential equations.
 
-Using this library, combined with parallel iterators, we can generate more efficient versions of
+Using this library, combined with parallel iterators, we generate more efficient versions of
 
 * Numpy
 * R
@@ -48,7 +52,7 @@ Using this library, combined with parallel iterators, we can generate more effic
 
 and many others.
 
-We can also target new architectures like Arm SVE which do not fit the X86 model.
+We have also targeted new architectures like Arm SVE which do not fit the X86 model.
 We are working with the Isambard A64FX cluster to attempt to improve existing
 algorithms.
 
@@ -113,7 +117,7 @@ pub fn inc_doubles_simd(x: &mut [f64]) {
 
 [Godbolt](https://godbolt.org/z/87eeadoej)
 
-we can simply write:
+we simply write:
 
 ```rust
 fn inc_doubles_scalar(x: &mut [f64]) {
@@ -135,26 +139,36 @@ operations to a long series of library calls.
 For example, the following rather innocent function, which absolutely should be vectorisable,
 converts itself into a series of function calls:
 
-```rust
-pub fn vector_sin(d: &mut [f64]) {
-    d.iter_mut().for_each(|d| *d = f64::sin(*d))
+```C
+#include <math.h>
+
+void vector_sin(double *d, int len) {
+    while (len--) {
+        *d = sin(*d);
+        ++d;
+    }
 }
 ```
 
-[Goldbolt](https://godbolt.org/z/x4jr6MdM3) gives:
+[Godbolt](https://godbolt.org/z/TG8on7Mfd) for x86-64 clang gives:
 
 ```
-.LBB0_6:
-        vmovsd  xmm0, qword ptr [r15 + 8*r12]
-        vmovsd  qword ptr [rsp], xmm0
-        vmovsd  xmm0, qword ptr [r15 + 8*r12 + 8]
-        call    r14
-        ... and 7 more calls like this.
-        vunpcklpd       xmm0, xmm0, xmmword ptr [rsp]
-        vmovups xmmword ptr [r15 + 8*r12 + 48], xmm0
-        add     r12, 8
+.LBB0_7:                                # =>This Inner Loop Header: Depth=1
+        vmovsd  xmm0, qword ptr [rbx + 8*rbp]   # xmm0 = mem[0],zero
+        call    sin
+        vmovsd  qword ptr [rbx + 8*rbp], xmm0
+        vmovsd  xmm0, qword ptr [rbx + 8*rbp + 8] # xmm0 = mem[0],zero
+        call    sin
+        vmovsd  qword ptr [rbx + 8*rbp + 8], xmm0
+        vmovsd  xmm0, qword ptr [rbx + 8*rbp + 16] # xmm0 = mem[0],zero
+        call    sin
+        vmovsd  qword ptr [rbx + 8*rbp + 16], xmm0
+        vmovsd  xmm0, qword ptr [rbx + 8*rbp + 24] # xmm0 = mem[0],zero
+        call    sin
+        vmovsd  qword ptr [rbx + 8*rbp + 24], xmm0
         add     rbp, 4
-        jne     .LBB0_6
+        cmp     r14d, ebp
+        jne     .LBB0_7
 ```
 
 Each call will take several hundred cycles.
@@ -202,6 +216,9 @@ pub fn runif(index: usize) -> f64 {
 }
 ```
 
+We tested both single and multi-threaded versions of these functions - easy
+in Rust as it is a naturally multi-threaded language - on a four core X86 laptop.
+
 |Library|Function|ns per iteration (smaller is better)|
 |-------|----|----------------|
 |Doctor Syn|runif|0.8|
@@ -237,6 +254,17 @@ fn qnorm(arg: fty) -> fty {
         * x;
     y * recip
 }
+
+/// Use qnorm to shape the uniform random number.
+pub fn rnorm(index: usize) -> f64 {
+    qnorm(runif(index) * 0.999 + 0.0005)
+}
+
+/// Parallel version in Rust.
+#[target_feature(enable = "avx2,fma")]
+unsafe fn test_par_rnorm(d: &mut [f64]) {
+    do_par(d, |d| *d = rnorm(ref_to_usize(d)));
+}
 ```
 
 |Library|Function|ns per iteration (smaller is better)|
@@ -251,10 +279,21 @@ fn qnorm(arg: fty) -> fty {
 So more than 60x speedup over the R version
 on a four core laptop and about 30x for numpy.
 
-## Work to do
+## Future work
 
 With an implementation of just two Doctor Syn functions, we have shown a significant performance boost
 over even the best-in-class Rust distribution system. This excellent result on a toy example shows excellent promise for what the generalised **Doctor Syn** system is capable of. 
 
-Work has started on support for ARM SVE, with work on the (Isambard)[https://gw4.ac.uk/isambard/] A64FX supercomputing cluster underway. The Doctor Syn method also provides flexibility in the accuracy of the solution it provides, and we are exploring super-accurate versions of our functions by using larger sizes, table lookups or fixed point integer arithmetic. Finally, we are working on the substantial task of full verification as well as generation of R, python and Octave libraries. 
+Work has started on support for ARM SVE, The Doctor Syn method also provides flexibility
+in the accuracy of the solution it provides, and we are exploring super-accurate
+versions of our functions by using larger sizes, table lookups or fixed point integer
+arithmetic. Finally, we are working on the substantial task of full verification as
+well as generation of R, python and Octave libraries. 
+
+If you want to use this technology, get in touch. We are keen to develop industry
+partnerships with companies who require extra performance in their machine learning
+and computational processes.
+
+andy@atomicincrement.com
+jeremy.bennett@embecosm.com
 
