@@ -5,7 +5,7 @@ date:   2021-11-18
 categories: maths
 ---
 
-## Doctor Syn
+## Executive Summary
 
 The problem facing the AI industry today is that many of the functions at
 the heart of machine learning processes were written over forty years ago
