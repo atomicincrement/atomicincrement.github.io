@@ -290,7 +290,7 @@ versions of our functions by using larger sizes, table lookups or fixed point in
 arithmetic. Finally, we are working on the substantial task of full verification as
 well as generation of R, python and Octave libraries. 
 
-If you want to use this technology, get in touch. We are keen to develop industry
+Atomic Increment is developing this technology in partnership with [Embecosm](https://www.embecosm.com). If you want to use this technology, get in touch. We are keen to develop industry
 partnerships with companies who require extra performance in their machine learning
 and computational processes.
 
