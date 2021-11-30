@@ -277,7 +277,7 @@ unsafe fn test_par_rnorm(d: &mut [f64]) {
 |rand_distr|parallel Normal::sample()|1.7|
 |R|rnorm|60.0|
 |Numpy|numpy.random.uniform|31.9|
-|C++|`uniform_real_distribution` -O3|31.0|
+|C++|`normal_distribution<double>` -O3|31.0|
 
 So more than 60x speedup over the R version
 on a four core laptop and about 30x for numpy
