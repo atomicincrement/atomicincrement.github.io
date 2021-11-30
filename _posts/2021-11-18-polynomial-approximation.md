@@ -221,12 +221,14 @@ in Rust as it is a naturally multi-threaded language - on a four core X86 laptop
 
 |Library|Function|ns per iteration (smaller is better)|
 |-------|----|----------------|
-|Doctor Syn|runif|0.8|
-|Doctor Syn|parallel runif|0.6|
-|rand|ThreadRnd::gen()|5.1|
-|rand|parallel ThreadRnd::gen()|2.1|
-|R|runif|20.0|
-|Numpy|numpy.random.uniform|13.0|
+|Doctor Syn|`runif`|0.8|
+|Doctor Syn|parallel `runif`|0.6|
+|rand|`ThreadRnd::gen()`|5.1|
+|rand|parallel `ThreadRnd::gen()`|2.1|
+|R|`runif`|20.0|
+|Numpy|`numpy.random.uniform`|13.0|
+|C|`rand() * (1.0/RAND_MAX)` -O3|6.0|
+|C++|`uniform_real_distribution` -O3|13.6|
 
 So clearly, we do well against even the best Rust version and
 much better (over 20 times better) than R and Numpy.
@@ -275,9 +277,11 @@ unsafe fn test_par_rnorm(d: &mut [f64]) {
 |rand_distr|parallel Normal::sample()|1.7|
 |R|rnorm|60.0|
 |Numpy|numpy.random.uniform|31.9|
+|C++|`uniform_real_distribution` -O3|31.0|
 
 So more than 60x speedup over the R version
-on a four core laptop and about 30x for numpy.
+on a four core laptop and about 30x for numpy
+and C++.
 
 ## Future work
 
