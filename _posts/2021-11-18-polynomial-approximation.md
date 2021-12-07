@@ -27,8 +27,6 @@ approximations to key functions important to the execution of many programs. You
 | f32/f64::exp      | $$e^x$$|
 | f32/f64::ln      | $$\log{x}$$|
 
-[See Wikipedia](https://en.wikipedia.org/wiki/C_mathematical_functions)
-
 While improving these functions has a lot of value, we are currently focusing most of our effort on statistical functions such as:
 
 | R Function | distribution | role | calculates |
@@ -37,8 +35,6 @@ While improving these functions has a lot of value, we are currently focusing mo
 | pnorm      | normal | cdf | $$\frac{1}{2}\left[1 + \operatorname{erf}\left( \frac{x-\mu}{\sigma\sqrt{2}}\right)\right] $$|
 | qnorm      | normal | quantile | $$\mu+\sigma\sqrt{2} \operatorname{erf}^{-1}(2p-1)$$|
 | rnorm      | normal | random | $$ \operatorname{qnorm}(\operatorname{runif}(i)) $$|
-
-[See the R documentation](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/Normal.html)
 
 These functions are used extensively in finance and bioinformatics to perform statistical
 inference, stochastic modelling, AI and Machine learning. For example, rnorm is a key part of many
@@ -63,19 +59,22 @@ Autovectorisation to work effectively.
 
 ## The AI sound barrier
 
-While great effort has been expended in key function optimization, current techniques are unable to efficiently utilize modern compiler technology such as auto-vectorisation and thread based parallelism. This leads to the situation in which users are forced to trade off accuracy and speed, with no implementation that is both *fast* and *accurate*.
+While great effort has been expended in key function optimization, current techniques are unable to efficiently utilize modern compiler technology such as auto-vectorisation and thread based parallelism. 
+Research in function approximation has focused on queezing out the last half bit of precision
+of functions at the expense of making functions every more complex and very much slower.
 
-[See this for an example of *accurate*](https://blog.sigplan.org/2021/08/26/high-performance-correctly-rounded-math-libraries-for-32-bit-floating-point-representations/)
+In practice, machine learning algorithms can tolerate a large amount of error and giving users
+the ability to choose the level of accuracy that a function delivers as well as the domain
+of inputs can make those algorithms orders of magnitude faster.
 
-[See this discussion on *fast* on Stack Overflow](https://stackoverflow.com/questions/18662261/fastest-implementation-of-sine-cosine-and-square-root-in-c-doesnt-need-to-b)
+For example, using 32 bit floating point instead of 64 bit often has a 4:1 performance advantage
+in compute and a 2:1 advantage in memory performance. With modern computers, the memory bandwidth
+is very often the limiting factor and finding smarter ways to represent data becomes the key
+to fast algorithms. If we know that a vector of numbers does not contain NaN values, then we can
+skip NaN checks on every calculation.
 
-The result is usually a compromise and this has been the status quo for several
-decades now. In fact there have been very few improvements to math libraries
-since apart from hand-written assembler versions of older functions. This has
-created a "sound barrier" that has yet to be broken where AI code is limited
-to a certain performance. To go faster, you will need to buy expensive GPU
-hardware that consumes enormous amounts of power and then your
-benefit will be minimal.
+But primarily, we need to make our functions simple enough to be vectorisable - once we have achieved
+this, we get remarkable performance improvements.
 
 ## The challenge of vectorisation.
 
@@ -91,7 +90,8 @@ There is no short and simple fix to this problem either, these problems are fund
 ## Autovectorisation
 
 In the past we have implemented fast functions in assembler or even written assembler
-to write functions in machine code. These days however, we often try to take a more "civilized" approach where possible. Assembler functions are fast, but difficult to read, difficult to improve, and difficult to generalize. Despite these problems, many such functions end up hanging around like a bad smell, and more are being produced by chip vendors for special architectures. Even excellent libraries like [Sleef](https://github.com/shibatch/sleef/blob/master/src/arch/helperavx512f.h) are done this way with machine specific intrinsics.
+to write functions in machine code. These days however, we often try to take a more "civilized" approach where possible. Assembler functions are fast, but difficult to read, difficult to improve, and difficult to generalize. Despite these problems, many such functions end up hanging around like a bad smell, and more are being produced by chip vendors for special architectures. Even excellent libraries like Sleef
+are done this way with machine specific intrinsics.
 
 To solve the problems with these architecture specific assembly implementations, we try and write portable code; we wish our code to be able to run on both x86 architectures with SIMD as well as the new ARM SVE with variable sized registers. The way we achieve this is by trying to write code in such a way as that it will be automatically vectorised by modern compilers.
 
@@ -115,8 +115,6 @@ pub fn inc_doubles_simd(x: &mut [f64]) {
 }
 ```
 
-[Godbolt](https://godbolt.org/z/87eeadoej)
-
 we simply write:
 
 ```rust
@@ -126,8 +124,6 @@ fn inc_doubles_scalar(x: &mut [f64]) {
     }
 }
 ```
-
-[Godbolt](https://godbolt.org/z/qG5asYMGn)
 
 This is much easier to read, works on all known hardware without modifications and
 does not specify a vector size, which might be variable.
@@ -150,7 +146,7 @@ void vector_sin(double *d, int len) {
 }
 ```
 
-[Godbolt](https://godbolt.org/z/TG8on7Mfd) for x86-64 clang gives:
+Clang gives:
 
 ```
 .LBB0_7:                                # =>This Inner Loop Header: Depth=1
@@ -194,14 +190,13 @@ allowing inlining and as a result the chance of them inlining is much increased.
 ## Example - sampling from the normal distribution.
 
 We tested some of our generated functions against one of the best stats distribution
-libraries in the Rust world - [rand_distr](https://docs.rs/rand_distr/0.4.2/rand_distr/).
+libraries in the Rust world - `rand_distr`.
 
-Combined with [rayon](https://docs.rs/rayon/1.5.1/rayon/) the parallel execution library
+Combined with `rayon` the parallel execution library
 this would have been the best choice for monte carlo experiments.
 
 We started with a uniform random number generator, based on a
-[xorshift](https://en.wikipedia.org/wiki/Xorshift) hash and tested this against
-rust's [ThreadRng](https://docs.rs/rand/0.8.4/rand/fn.thread_rng.html).
+`xorshift` hash and tested this against rust's `ThreadRng`.
 
 By using a hash of an integer index instead of a sequence, we are able to
     parallelise random number generation.
@@ -234,7 +229,8 @@ So clearly, we do well against even the best Rust version and
 much better (over 30 times better) than R and Numpy.
 
 Moving to normal random number generation, we use the quantile (or probit) function
-to shape the random variable:
+to shape the random variable - this is a very simple version good to about six
+decimal digits, more accurate versions using `log` and `sqrt` are also available.
 
 ```
 fn qnorm(arg: fty) -> fty {
@@ -279,7 +275,7 @@ unsafe fn test_par_rnorm(d: &mut [f64]) {
 |Numpy|numpy.random.uniform|60.4|
 |C++|`normal_distribution<double>` -O3|31.0|
 
-So more than 60x speedup over the R an dpython versions
+So more than 60x speedup over the R and python versions
 on a four core laptop and about 30x for C++.
 
 ## Future work
