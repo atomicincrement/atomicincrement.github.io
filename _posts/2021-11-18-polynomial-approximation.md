@@ -60,7 +60,7 @@ Autovectorisation to work effectively.
 ## The AI sound barrier
 
 While great effort has been expended in key function optimization, current techniques are unable to efficiently utilize modern compiler technology such as auto-vectorisation and thread based parallelism. 
-Research in function approximation has focused on queezing out the last half bit of precision
+Research in function approximation has focused on squeezing out the last half bit of precision
 of functions at the expense of making functions every more complex and very much slower.
 
 In practice, machine learning algorithms can tolerate a large amount of error and giving users
