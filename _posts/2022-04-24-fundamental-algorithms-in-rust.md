@@ -236,6 +236,29 @@ pub fn quick_sort(values: &mut [i32]) {
 }
 ```
 
+### Radix sort
+
+If your key has a limited alphabet, it may be simplest to have a set of buckets
+for each of your keys.
+
+For example, we can partition a library of books by the first letter of the
+author's name.
+
+A variant of this is the method used by old tabulating machines.
+
+First partition by the last letter of the word.
+Next partition by the penultimate letter.
+Repeat until you partition by the first letter.
+Your data is sorted alphabetically!
+
+Floating point numbers can be radix sorted by treating them
+as binary.
+
+In practice, a good sort is usually the combination of several
+other sorts.
+
+Parallel sorts partition data and sort on multiple threads.
+
 ## Containers
 
 Containers in Rust encapsulate standard data structures made popular by
@@ -267,7 +290,186 @@ A vector is nearly always the correct data structure to use to get the
 best performance. More complex data structure exist, but they all require
 multiple memory allocations and leave the memory in a fragmented state.
 
+### Linked lists
+
+Linked lists were a popular way to store data which needed easy inserts
+but could not be randomly accessed.
+
+When CPUs started using caches, they became much less useful as they
+exhibit a phenomenom known as *pointer chasing* where a CPU's pipeline
+must be flushed before the next element can be found.
+
+These days they are mostly used only in programming tests.
+
+```rust
+struct LinkedList {
+    key: i32,
+    next: Option<Box<LinkedList>>
+}
+```
+
 ### Hash maps
 
 A hash map maps a key (often a string) to a value.
 
+The `hash` is a number computed from the key. For example if the key is an integer
+a simple hash might be the sum of the decimal digits.
+
+The hash is used to index an array and find the first element. Subsequent
+searches 
+
+Hash maps are part of the standard libraries of many languages and are used
+by interpreted languages to represent objects.
+
+In practice, great care is needed to maintain a hash map. The hash need to
+be comple enough to separate the elements but not be more complex than
+just a linear search of the keys. Most hash maps fail this test
+for common use cases.
+
+This is a very simple open addressing hash map with integer keys and values.
+It will fail spectacularily with more than 16 insertions, and real implementations
+will grow the underlying vector on demand.
+
+```rust
+// Must be a power of 2
+const HASHLEN : usize = 4;
+
+struct OpenAdressingHashMap {
+    kv: [(i32, i32); HASHLEN],
+    n: usize
+}
+
+impl OpenAdressingHashMap {
+    pub fn new() -> Self {
+        OpenAdressingHashMap { kv: [(-1, 0); HASHLEN], n: 0 }
+    }
+
+    fn hash(k: i32) -> usize {
+        (k * 123) as usize
+    }
+
+    pub fn insert(&mut self, k: i32, v: i32) {
+        assert!(self.n + 1 < self.kv.len());
+        let mask = self.kv.len() - 1;
+        let mut hash = OpenAdressingHashMap::hash(k);
+        while self.kv[hash & mask].0 != -1 {
+            hash += 1;
+        }
+        self.n += 1;
+        self.kv[hash & mask] = (k, v);
+    }
+
+    pub fn get(&self, k: i32) -> Option<i32> {
+        assert!(k >= 0);
+        let mask = self.kv.len() - 1;
+        let mut hash = OpenAdressingHashMap::hash(k);
+        while self.kv[hash & mask].0 != -1 {
+            if self.kv[hash & mask].0 == k {
+                return Some(self.kv[hash & mask].1);
+            }
+            hash += 1;
+        }
+        return None;
+    }
+}
+
+
+fn main() {
+    let mut hm = OpenAdressingHashMap::new();
+
+    hm.insert(100, 1);
+    hm.insert(123456, 2);
+
+    println!("{:?}", hm.get(100));
+    println!("{:?}", hm.get(123456));
+    println!("{:?}", hm.get(5432));
+}
+```
+
+When we insert into the map, we find an empty slot after the
+first matching hash and set the key and value.
+
+When we query the map, we start at the first matching hash and
+search until we either find a match or an empty slot.
+
+Many other variants exist including the now largely defunct
+separate chaining hash table and having multiple hash functions.
+
+For constant data, you can compute a hash function that gets
+the result in a single hop.
+
+### Binary trees
+
+The traditional way of maintaining a large sorted set of data is
+a binary tree. This is also available in most standard libraries.
+
+```rust
+struct Node {
+    key: i32,
+    value: i32,
+    children: [Option<Box<Node>>; 2],
+}
+
+struct BTree {
+    nodes: Option<Node>,
+}
+```
+
+Binary trees have a lot of complexity because they need to be balanced.
+
+Imagine inserting a sequence of numbers 0..1000000 into a binary tree.
+
+The first node will be zero, but all the subsequent nodes will be right nodes.
+Now we have just a linked list, which is very bad.
+
+```rust
+BTree {
+    nodes: Some(
+        Node {
+            key: 0,
+            value: 0,
+            children: [
+                None,
+                Some(
+                    Node {
+                        key: 1,
+                        value: 1,
+                        children: [
+                            None,
+                            ...,
+                        ],
+                    },
+                ),
+            ],
+        },
+    ),
+}
+```
+
+Binary trees are also bad because each node needs to be allocated with `malloc`.
+This call gets some new memory from the heap, but this is very slow.
+
+### Sorted vectors
+
+A much better scheme than binary trees is usually to maintain a sorted vector.
+We can then use a binary search to find the values in $$O(log(N))$$ steps.
+Furthermore the cache will be warm as you do this search and only the leaf
+values will be fetched. There is little or no `malloc` but some pointer chasing.
+
+For constant data, the sort can be done in one go, for constantly updated
+data we can partition the vector into sorted and unsorted data. When querying
+the data we first do a linear search on the unsorted data and then a binary
+search on the sorted data. When the unsorted data grows large, we merge it
+into the sorted data.
+
+Many databases systems work this way.
+
+
+# Conclusions
+
+There is no one good algorithm or data structure for any purpose. If you
+want the massive performance gains of a custom algorithm, you must design
+the problem to fit the solution.
+
+Three orders of magnitude performance gains of standard library methods
+are not unusual, especially if the data is cut to the bone.
