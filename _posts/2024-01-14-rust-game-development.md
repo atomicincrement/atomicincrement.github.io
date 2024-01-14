@@ -23,17 +23,21 @@ that use C# are actually written in C++.
 
 So why C++ and more recently, why Rust?
 
-Andy Thomason has worked in the game industry since the 1970's developing
-Namco console games and AI Chess players in Z80 assembler as a teenager.
+* Part 1 - The case for Rust in games.
+* Part 2 - An example: breakout in Bevy
 
-He has worked for Sony twice (Psygnosis and SN Systems) doing research
-in game technology such as the PS3 and Vita compilers.
+*Andy Thomason has worked in the game industry since the 1970's developing
+Namco console games and AI Chess players in Z80 assembler as a teenager.*
 
-## The C/C++ programming model.
+*He has worked for Sony twice (Psygnosis and SN Systems) doing research
+in game technology such as the PS3 and Vita compilers.*
+
+# Part 1 - The case for Rust in games.
+
+## The C/C++ programming model - Stack and Heap
 
 C++ is based on C and in fact the original C++ compiler, CFront transcoded
-C++ into C. Like many languages before, C uses as "Stack and Heap" model
-to handle dynamically created objects.
+C++ into C. C uses as "Stack and Heap" model to handle dynamically created objects.
 
 If we write a C function with a variable
 
@@ -90,6 +94,9 @@ to write to hardware registers directly, bypassing bulky APIs.
 C++ also lets you use multithreaded code and most modern C++ game
 engines let you create huge number of tasks and events which
 will be handled during the frame or over the course of many frames.
+
+In garbage collected languages like C#, objects are *only* allocated
+on the heap which is much costlier than allocating on the stack.
 
 ## Problems with C and C++
 
@@ -282,3 +289,231 @@ preferable to being stuck in a room of hundreds of C++
 programmers on an industrial estate in the middle of nowhere,
 not to mention any game studios in particular!
 
+# Part 2 - An example: breakout in Bevy
+
+To illustrate what it is like to write a game in Rust, lets start
+with one of the examples from the Bevy game engine:
+
+[Breakout](https://github.com/bevyengine/bevy/blob/main/examples/games/breakout.rs)
+
+Like in C and C++, the entry point to a Rust program is `main()`
+
+```Rust
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .run();
+}
+```
+
+If this is all we did, then we would get a blank window.
+
+So what we need to do is add data and code to make breakout run.
+
+This adds two data *resources*, a scoreboard which we will define
+and a clear colour which is a system defined resource.
+
+```Rust
+        .insert_resource(Scoreboard { score: 0 })
+        .insert_resource(ClearColor(BACKGROUND_COLOR))
+```
+
+Next we add an event, which we will use to signal collisions
+between the ball and other entities.
+
+```Rust
+        .add_event::<CollisionEvent>()
+```
+
+And to make the game work, we have some systems which are
+functions that get called to update things.
+
+```Rust
+        .add_systems(Startup, setup)
+        .add_systems(
+            FixedUpdate,
+            (
+                apply_velocity,
+                move_paddle,
+                check_for_collisions,
+                play_collision_sound,
+            ).chain(),
+        )
+        .add_systems(Update, (update_scoreboard, bevy::window::close_on_esc))
+```
+
+The `.chain()` makes these functions get run in sequence. Bevy
+is a multi-threaded game engine and may run systems in any order
+on different threads if needs be.
+
+The first of these systems is `setup` which is called at the Start
+of the game.
+
+```Rust
+// Add the game's entities to our world
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    asset_server: Res<AssetServer>,
+) {
+    // ...
+}
+```
+
+The parameters to setup can come in any order and
+use Rust's flexible type system to make Assets and
+other components acessible to the function.
+
+The `commands` parameter is an interface that lets you
+change the state of the game. For example:
+
+```Rust
+    commands.spawn(Camera2dBundle::default());
+```
+
+sets up a 2D camera for the game world.
+
+```Rust
+    // Sound
+    let ball_collision_sound = asset_server.load("sounds/breakout_collision.ogg");
+    commands.insert_resource(CollisionSound(ball_collision_sound));
+```
+
+adds a sound resource to the game.
+
+```Rust
+    commands.spawn((
+        SpriteBundle {
+            // ...
+        },
+        Paddle,
+        Collider,
+    ));
+```
+
+Adds a *bundle* of components to an entity (the paddle). A bundle is
+an easy way of deploying a number of components at a time.
+
+The component system is similar to Unity. Each object in the game
+world has a number of components such as `Transform` and `Sprite` as
+well as some user-defined components.
+
+The `Transform` component, for example, specifies the location
+of a sprite and the `Sprite` component describes the colour, image
+and other properties.
+
+Here `Paddle` and `Collider` are user defined components.
+
+Likewise, we spawn entities such as the ball, the bricks, the walls
+and so on.
+
+### Making custom components
+
+Making custom components is easy in Bevy. We use a `derive` macro
+to generate extra code needed for the component. In these two cases
+there is no extra data needed, so the structs don't need curly braces:
+
+```Rust
+#[derive(Component)]
+struct Paddle;
+
+#[derive(Component)]
+struct Ball;
+```
+
+The types, however, are used to make a distinction between `Paddle`
+and `Ball` and will be used to select the components when we run the systems.
+
+### Moving the paddle
+
+To move the paddle, we need a system which takes user input and
+all the entities which have `Transform` and `Paddle` components like this:
+
+```Rust
+fn move_paddle(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut query: Query<&mut Transform, With<Paddle>>,
+    time: Res<Time>,
+) {
+    let mut paddle_transform = query.single_mut();
+}
+```
+
+there is only one paddle, so `query.single_mut();` will do
+and also enable us to write to the transform (move the paddle).
+
+By default in Rust, references like `&Transform` are read-only
+and we need to use `&mut Transform` and `single_mut` to allow
+us to change the transform.
+
+The rest of the function reads the keyboard and moves the paddle.
+
+### Checking for collisions
+
+```Rust
+fn check_for_collisions(
+    mut commands: Commands,
+    mut scoreboard: ResMut<Scoreboard>,
+    mut ball_query: Query<(&mut Velocity, &Transform), With<Ball>>,
+    collider_query: Query<(Entity, &Transform, Option<&Brick>), With<Collider>>,
+    mut collision_events: EventWriter<CollisionEvent>,
+) {
+    // ...
+}
+```
+
+This system has:
+
+* An interface to change the engine state.
+* A writeable `Scoreboard` resource.
+* A query to find the Velocity and Transform of the ball.
+* A query to find anything with a Transform and a collider, which may be a brick.
+* An `EventWriter` to signal collisions to other systems.
+
+We spin round checking the ball position against the bricks and walls, updating the scoreboard
+and sending events if anything collides.
+
+### Sounds
+
+```Rust
+fn play_collision_sound(
+    mut commands: Commands,
+    mut collision_events: EventReader<CollisionEvent>,
+    sound: Res<CollisionSound>,
+) {
+    // ...
+}
+```
+
+Here we receive collision events and convert them into
+sounds.
+
+We create the sound by *spawning* the collision `sound`
+in a bundle. Yes! sounds are entities too.
+
+## Multithreading
+
+Because of the danger of race conditions, Bevy is careful
+not to call two systems at the same time with a mutable
+reference to the same component.
+
+Bevy's use of `#[derive]` and the Rust type system
+makes for a more C#-like development environment.
+
+With very large games, with hundreds of thousands of entitites,
+this will make a big difference.
+
+# That's all folks
+
+We talked a little about how Rust, a low level language,
+makes it easier to write safe multi-threaded code, stealing
+some thunder from C# and giving a significant performance
+boost.
+
+We showed you how easy it is to build games using the
+Bevy ECS (Entity-component-system) model.
+
+So happy Rusting, and if you get the opportunity,
+try writing a game in Bevy. It may take a bit of
+getting used to, but you are a champion!
