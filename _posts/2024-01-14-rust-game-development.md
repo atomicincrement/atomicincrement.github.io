@@ -312,6 +312,9 @@ So what we need to do is add data and code to make breakout run.
 
 This adds two data *resources*, a scoreboard which we will define
 and a clear colour which is a system defined resource.
+Resources are not *assets* and do not draw themselves. We need
+*entities* for the rendering plugin to draw anything, for example.
+Resources are just bits of data which we will use.
 
 ```Rust
         .insert_resource(Scoreboard { score: 0 })
