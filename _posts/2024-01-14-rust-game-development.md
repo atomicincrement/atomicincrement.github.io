@@ -25,6 +25,7 @@ So why C++ and more recently, why Rust?
 
 * Part 1 - The case for Rust in games.
 * Part 2 - An example: breakout in Bevy
+* Links
 
 *Andy Thomason has worked in the game industry since the 1970's developing
 Namco console games and AI Chess players in Z80 assembler as a teenager.*
@@ -208,9 +209,6 @@ and are pushing the ecosystem. We are on the verge
 of seing a new generation of Rust game engines
 become stable enough for large scale development.
 
-See [Are We game Yet?](https://arewegameyet.rs/)
-for a huge list of game engines and libraries.
-
 For example libraries for:
 
 * Windowing
@@ -224,8 +222,6 @@ For example libraries for:
 * 3D format loaders
 * Maths
 * Mesh tools.
-
-[Ecosystem](https://arewegameyet.rs/#ecosystem)
 
 etc.
 
@@ -242,24 +238,16 @@ I've been using Bevy engine to do shader experiments with molecular
 modelling, for example. Bevy uses Webgpu to make games that
 can run on desktops, phones, browsers and many more platforms.
 
-Bevy has VR support, networking and many more things but it
+**Bevy** has VR support, networking and many more things but it
 is still and "expert" level tool, it doesn't have the easy
 gui that Unity has but suits my way of working.
 
-[Bevy Game Engine](https://bevyengine.org/)
-
-Fyrox has a GUI-driven scene generator and is orientated at
+**Fyrox** has a GUI-driven scene generator and is orientated at
 scripting like Unity:
-
-[Fyrox Game Engine](https://fyrox-book.github.io/beginning/scripting.html)
 
 Amethyst is also quite programmer orientated
 
-[Amethyst Game Engine](https://amethyst.rs/)
-
-As is Piston:
-
-[Piston game engine](https://www.piston.rs/)
+As is **Piston**.
 
 ## What needs to happen
 
@@ -293,8 +281,6 @@ not to mention any game studios in particular!
 
 To illustrate what it is like to write a game in Rust, lets start
 with one of the examples from the Bevy game engine:
-
-[Breakout](https://github.com/bevyengine/bevy/blob/main/examples/games/breakout.rs)
 
 Like in C and C++, the entry point to a Rust program is `main()`
 
@@ -520,3 +506,17 @@ Bevy ECS (Entity-component-system) model.
 So happy Rusting, and if you get the opportunity,
 try writing a game in Bevy. It may take a bit of
 getting used to, but you are a champion!
+
+# Links
+
+[Breakout](https://github.com/bevyengine/bevy/blob/main/examples/games/breakout.rs)
+
+[Are we game yet Ecosystem](https://arewegameyet.rs/#ecosystem)
+
+[Bevy Game Engine](https://bevyengine.org/)
+
+[Fyrox Game Engine](https://fyrox-book.github.io/beginning/scripting.html)
+
+[Amethyst Game Engine](https://amethyst.rs/)
+
+
